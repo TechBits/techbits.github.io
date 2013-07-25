@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"><channel><title>TechBits</title><link></link><description></description><copyright>2012, Shane R. Spencer</copyright><lastBuildDate>Wed, 07 Nov 2012 09:12:09 -0900</lastBuildDate><item><title>The proof is in the pudding</title><link>/2012/11/07/posts/thepudding.html</link><description>&lt;div id=the-proof-is-in-the-pudding class=section&gt;
+&lt;h1&gt;The proof is in the pudding&lt;a class=headerlink title="Permalink to this headline" href=/2012/11/07/posts/thepudding.html#the-proof-is-in-the-pudding&gt;¶&lt;/a&gt;&lt;/h1&gt;
+&lt;p&gt;Well.. this is simple enough.  I started using Sphinx to create this blog.  Previously I had checked out Pelican
+and Jekyll.  Both were pretty awesome.. however the lack of search and my lack of familiarity with both was getting
+in the way of me getting something out quickly.  I want to blog!  I want to use GitHub to do it!  Get out of my way!&lt;/p&gt;
+&lt;p&gt;The source for this blog is available via the.. source of this page as well as this project on GitHub.  It’s
+really, honestly, quite simple to create a blog with Sphinx.&lt;/p&gt;
+&lt;div id=gotchas class=section&gt;
+&lt;h2&gt;Gotchas&lt;a class=headerlink title="Permalink to this headline" href=/2012/11/07/posts/thepudding.html#gotchas&gt;¶&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;No &lt;tt class="docutils literal"&gt;&lt;span class=pre&gt;tag&lt;/span&gt;&lt;/tt&gt; support.. yet.&lt;/p&gt;
+&lt;p&gt;No &lt;tt class="docutils literal"&gt;&lt;span class=pre&gt;tag&lt;/span&gt;&lt;/tt&gt; based syndication.  I will have to for &lt;tt class="docutils literal"&gt;&lt;span class=pre&gt;sphinxcontrib.feed&lt;/span&gt;&lt;/tt&gt; in order to add that.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=comments class=section&gt;
+&lt;h2&gt;Comments&lt;a class=headerlink title="Permalink to this headline" href=/2012/11/07/posts/thepudding.html#comments&gt;¶&lt;/a&gt;&lt;/h2&gt;
+
+        &lt;div id=disqus_thread&gt;&lt;/div&gt;
+        &lt;script type=text/javascript&gt;
+            /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+            var disqus_shortname = 'techbitsgithub'; // required: replace example with your forum shortname
+            var disqus_identifier = 'puddingcups';
+
+            /* * * DON'T EDIT BELOW THIS LINE * * */
+            (function() {
+                var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+                dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+                (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+            })();
+        &lt;/script&gt;
+        &lt;noscript&gt;Please enable JavaScript to view the &lt;a href="http://disqus.com/?ref_noscript"&gt;comments powered by Disqus.&lt;/a&gt;&lt;/noscript&gt;
+        &lt;a class=dsq-brlink href=http://disqus.com&gt;comments powered by &lt;span class=logo-disqus&gt;Disqus&lt;/span&gt;&lt;/a&gt;
+        &lt;/div&gt;
+&lt;/div&gt;
+</description><pubDate>Wed, 07 Nov 2012 09:12:09 -0900</pubDate><guid>/2012/11/07/posts/thepudding.html</guid></item><item><title>Django + Redis (master/slave) = Pseudo distributed event based caching</title><link>/2011/04/05/posts/redispimping.html</link><description>&lt;div id=django-redis-master-slave-pseudo-distributed-event-based-caching class=section&gt;
+&lt;h1&gt;Django + Redis (master/slave) = Pseudo distributed event based caching&lt;a class=headerlink title="Permalink to this headline" href=/2011/04/05/posts/redispimping.html#django-redis-master-slave-pseudo-distributed-event-based-caching&gt;¶&lt;/a&gt;&lt;/h1&gt;
+&lt;p&gt;This article focuses on the following topology to address usingRedis as the cache
+backend for Django where sets and deletes aresent to a master Redis server along with a
+local or dedicated Redisserver for a set of or single cluster member.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;div&gt;&lt;ul class=simple&gt;
+&lt;li&gt;‘Cluster Slave 1’ &amp;lt;- ‘Cluster Master 1’&lt;/li&gt;
+&lt;li&gt;‘Cluster Slave 2’ &amp;lt;- ‘Cluster Master 1’&lt;/li&gt;
+&lt;li&gt;‘Cluster Slave 3’ &amp;lt;- ‘Cluster Master 1’&lt;/li&gt;
+&lt;li&gt;‘Django Node 1’ uses ‘Cluster Slave 1’ as ‘default’ and Cluster Master 1 as ‘master’&lt;/li&gt;
+&lt;li&gt;‘Django Node 2’ uses ‘Cluster Slave 2’ as ‘default’ and Cluster Master 1 as ‘master’&lt;/li&gt;
+&lt;li&gt;‘Django Node 3’ uses ‘Cluster Slave 3’ as ‘default’ and Cluster Master 1 as ‘master’&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;&lt;/blockquote&gt;
+&lt;p&gt;All updates from ‘Cluster Master 1’ are sent to all slaves as quickly as possible, not
+atomic, not verified. This requires you to expect slave cache keys to timeout
+appropriately as a backup.&lt;/p&gt;
+&lt;p&gt;You should note that using this method does not necessarilyaugment the standard of a
+memory cache.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;div&gt;&lt;ul class=simple&gt;
+&lt;li&gt;Store/Fetch/Invalidate Keys&lt;/li&gt;
+&lt;li&gt;Keys can be deleted at any time&lt;/li&gt;
+&lt;li&gt;The application is ultimately responsible for understanding cache behaviour&lt;/li&gt;
+&lt;li&gt;Caches in a cluster may hold different values for a key&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;&lt;/blockquote&gt;
+&lt;p&gt;Number 4 is really only ever seen in a replicated or isolated environment where the
+backend is a database slave, a database in a master/master relationship, redis, or when
+using many different local caches per cluster. In the setup I am testing there is a
+single local slave at ‘10.10.0.41’ and a single master at ‘10.10.0.40’. The redis
+servers are already configured, here is the Django cache configuraiton.&lt;/p&gt;
+&lt;div class=highlight-python&gt;&lt;table class=highlighttable&gt;&lt;tr&gt;&lt;td class=linenos&gt;&lt;div class=linenodiv&gt;&lt;pre&gt;1
+2
+3
+4&lt;/pre&gt;&lt;/div&gt;&lt;td class=code&gt;&lt;div class=highlight&gt;&lt;pre&gt;&lt;span class=n&gt;CACHES&lt;/span&gt; &lt;span class=o&gt;=&lt;/span&gt; &lt;span class=p&gt;{&lt;/span&gt;
+    &lt;span class=s&gt;'default'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=p&gt;{&lt;/span&gt;&lt;span class=s&gt;'BACKEND'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=s&gt;'redis_cache.RedisCache'&lt;/span&gt;&lt;span class=p&gt;,&lt;/span&gt; &lt;span class=s&gt;'LOCATION'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=s&gt;'10.10.0.41:6379'&lt;/span&gt;&lt;span class=p&gt;,},&lt;/span&gt;
+    &lt;span class=s&gt;'master'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=p&gt;{&lt;/span&gt;&lt;span class=s&gt;'BACKEND'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=s&gt;'redis_cache.RedisCache'&lt;/span&gt;&lt;span class=p&gt;,&lt;/span&gt; &lt;span class=s&gt;'LOCATION'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=s&gt;'10.10.0.40:6379'&lt;/span&gt;&lt;span class=p&gt;,},&lt;/span&gt;
+&lt;span class=p&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;And lets do a little testing:&lt;/p&gt;
+&lt;div class=highlight-python&gt;&lt;table class=highlighttable&gt;&lt;tr&gt;&lt;td class=linenos&gt;&lt;div class=linenodiv&gt;&lt;pre&gt; 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24&lt;/pre&gt;&lt;/div&gt;&lt;td class=code&gt;&lt;div class=highlight&gt;&lt;pre&gt;&lt;span class=gp&gt;&amp;gt;&amp;gt;&amp;gt; &lt;/span&gt;&lt;span class=kn&gt;from&lt;/span&gt; &lt;span class=nn&gt;django.core.cache&lt;/span&gt; &lt;span class=kn&gt;import&lt;/span&gt; &lt;span class=n&gt;get_cache&lt;/span&gt;
+&lt;span class=gp&gt;&amp;gt;&amp;gt;&amp;gt; &lt;/span&gt;&lt;span class=n&gt;slave&lt;/span&gt; &lt;span class=o&gt;=&lt;/span&gt; &lt;span class=n&gt;get_cache&lt;/span&gt;&lt;span class=p&gt;(&lt;/span&gt;&lt;span class=s&gt;'default'&lt;/span&gt;&lt;span class=p&gt;)&lt;/span&gt;
+&lt;span class=gp&gt;&amp;gt;&amp;gt;&amp;gt; &lt;/span&gt;&lt;span class=n&gt;master&lt;/span&gt; &lt;span class=o&gt;=&lt;/span&gt; &lt;span class=n&gt;get_cache&lt;/span&gt;&lt;span class=p&gt;(&lt;/span&gt;&lt;span class=s&gt;'master'&lt;/span&gt;&lt;span class=p&gt;)&lt;/span&gt;
+&lt;span class=gp&gt;&amp;gt;&amp;gt;&amp;gt; &lt;/span&gt;&lt;span class=n&gt;master&lt;/span&gt;&lt;span class=o&gt;.&lt;/span&gt;&lt;span class=n&gt;set&lt;/span&gt;&lt;span class=p&gt;(&lt;/span&gt;&lt;span class=s&gt;'hi'&lt;/span&gt;&lt;span class=p&gt;,&lt;/span&gt;&lt;span class=s&gt;'there'&lt;/span&gt;&lt;span class=p&gt;)&lt;/span&gt;
+&lt;span class=go&gt;True&lt;/span&gt;
+&lt;span class=gp&gt;&amp;gt;&amp;gt;&amp;gt; &lt;/span&gt;&lt;span class=n&gt;slave&lt;/span&gt;&lt;span class=o&gt;.&lt;/span&gt;&lt;span class=n&gt;get&lt;/span&gt;&lt;span class=p&gt;(&lt;/span&gt;&lt;span class=s&gt;'hi'&lt;/span&gt;&lt;span class=p&gt;)&lt;/span&gt;
+&lt;span class=go&gt;'there'&lt;/span&gt;
+&lt;span class=go&gt;Huzzah.. it replicated!&lt;/span&gt;
+&lt;span class=gp&gt;&amp;gt;&amp;gt;&amp;gt; &lt;/span&gt;&lt;span class=n&gt;master&lt;/span&gt;&lt;span class=o&gt;.&lt;/span&gt;&lt;span class=n&gt;delete&lt;/span&gt;&lt;span class=p&gt;(&lt;/span&gt;&lt;span class=s&gt;'hi'&lt;/span&gt;&lt;span class=p&gt;)&lt;/span&gt;
+&lt;span class=gp&gt;&amp;gt;&amp;gt;&amp;gt; &lt;/span&gt;&lt;span class=n&gt;slave&lt;/span&gt;&lt;span class=o&gt;.&lt;/span&gt;&lt;span class=n&gt;get&lt;/span&gt;&lt;span class=p&gt;(&lt;/span&gt;&lt;span class=s&gt;'hi'&lt;/span&gt;&lt;span class=p&gt;)&lt;/span&gt;
+&lt;span class=go&gt;Huzzah.. it deleted!&lt;/span&gt;
+&lt;span class=gp&gt;&amp;gt;&amp;gt;&amp;gt; &lt;/span&gt;&lt;span class=n&gt;master&lt;/span&gt;&lt;span class=o&gt;.&lt;/span&gt;&lt;span class=n&gt;set&lt;/span&gt;&lt;span class=p&gt;(&lt;/span&gt;&lt;span class=s&gt;'hi'&lt;/span&gt;&lt;span class=p&gt;,&lt;/span&gt;&lt;span class=s&gt;'there'&lt;/span&gt;&lt;span class=p&gt;)&lt;/span&gt;
+&lt;span class=go&gt;True&lt;/span&gt;
+&lt;span class=gp&gt;&amp;gt;&amp;gt;&amp;gt; &lt;/span&gt;&lt;span class=n&gt;slave&lt;/span&gt;&lt;span class=o&gt;.&lt;/span&gt;&lt;span class=n&gt;set&lt;/span&gt;&lt;span class=p&gt;(&lt;/span&gt;&lt;span class=s&gt;'hi'&lt;/span&gt;&lt;span class=p&gt;,&lt;/span&gt;&lt;span class=s&gt;'pony'&lt;/span&gt;&lt;span class=p&gt;)&lt;/span&gt;
+&lt;span class=go&gt;True&lt;/span&gt;
+&lt;span class=gp&gt;&amp;gt;&amp;gt;&amp;gt; &lt;/span&gt;&lt;span class=n&gt;master&lt;/span&gt;&lt;span class=o&gt;.&lt;/span&gt;&lt;span class=n&gt;get&lt;/span&gt;&lt;span class=p&gt;(&lt;/span&gt;&lt;span class=s&gt;'hi'&lt;/span&gt;&lt;span class=p&gt;)&lt;/span&gt;
+&lt;span class=go&gt;'there'&lt;/span&gt;
+&lt;span class=gp&gt;&amp;gt;&amp;gt;&amp;gt; &lt;/span&gt;&lt;span class=n&gt;slave&lt;/span&gt;&lt;span class=o&gt;.&lt;/span&gt;&lt;span class=n&gt;get&lt;/span&gt;&lt;span class=p&gt;(&lt;/span&gt;&lt;span class=s&gt;'hi'&lt;/span&gt;&lt;span class=p&gt;)&lt;/span&gt;
+&lt;span class=go&gt;'pony'&lt;/span&gt;
+&lt;span class=go&gt;Huzzah.. it can be different!&lt;/span&gt;
+&lt;span class=gp&gt;&amp;gt;&amp;gt;&amp;gt; &lt;/span&gt;&lt;span class=n&gt;master&lt;/span&gt;&lt;span class=o&gt;.&lt;/span&gt;&lt;span class=n&gt;delete&lt;/span&gt;&lt;span class=p&gt;(&lt;/span&gt;&lt;span class=s&gt;'hi'&lt;/span&gt;&lt;span class=p&gt;)&lt;/span&gt;
+&lt;span class=gp&gt;&amp;gt;&amp;gt;&amp;gt; &lt;/span&gt;&lt;span class=n&gt;master&lt;/span&gt;&lt;span class=o&gt;.&lt;/span&gt;&lt;span class=n&gt;get&lt;/span&gt;&lt;span class=p&gt;(&lt;/span&gt;&lt;span class=s&gt;'hi'&lt;/span&gt;&lt;span class=p&gt;)&lt;/span&gt;
+&lt;span class=gp&gt;&amp;gt;&amp;gt;&amp;gt; &lt;/span&gt;&lt;span class=n&gt;slave&lt;/span&gt;&lt;span class=o&gt;.&lt;/span&gt;&lt;span class=n&gt;get&lt;/span&gt;&lt;span class=p&gt;(&lt;/span&gt;&lt;span class=s&gt;'hi'&lt;/span&gt;&lt;span class=p&gt;)&lt;/span&gt;
+&lt;span class=go&gt;Huzzah.. even though there were differences I can delete the key!&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;What this means to me is that I can use the master for all changes and isolate all
+lookups to the slave server and if I’m feeling frisky I can even update the slave
+server. Keep in mind that with Redis and the Django-Redis-Cache module you can specify a
+different namespace or rather database ID making the following possible.&lt;/p&gt;
+&lt;div class=highlight-python&gt;&lt;table class=highlighttable&gt;&lt;tr&gt;&lt;td class=linenos&gt;&lt;div class=linenodiv&gt;&lt;pre&gt;1
+2
+3
+4
+5&lt;/pre&gt;&lt;/div&gt;&lt;td class=code&gt;&lt;div class=highlight&gt;&lt;pre&gt;&lt;span class=n&gt;CACHES&lt;/span&gt; &lt;span class=o&gt;=&lt;/span&gt; &lt;span class=p&gt;{&lt;/span&gt;
+    &lt;span class=s&gt;'default'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=p&gt;{&lt;/span&gt; &lt;span class=s&gt;'BACKEND'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=s&gt;'redis_cache.RedisCache'&lt;/span&gt;&lt;span class=p&gt;,&lt;/span&gt; &lt;span class=s&gt;'LOCATION'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=s&gt;'10.10.0.41:6379'&lt;/span&gt;&lt;span class=p&gt;,&lt;/span&gt; &lt;span class=s&gt;'OPTIONS'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=p&gt;{&lt;/span&gt; &lt;span class=s&gt;'DB'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=mi&gt;1&lt;/span&gt;&lt;span class=p&gt;,&lt;/span&gt; &lt;span class=p&gt;},&lt;/span&gt; &lt;span class=p&gt;},&lt;/span&gt;
+    &lt;span class=s&gt;'master'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=p&gt;{&lt;/span&gt; &lt;span class=s&gt;'BACKEND'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=s&gt;'redis_cache.RedisCache'&lt;/span&gt;&lt;span class=p&gt;,&lt;/span&gt; &lt;span class=s&gt;'LOCATION'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=s&gt;'10.10.0.40:6379'&lt;/span&gt;&lt;span class=p&gt;,&lt;/span&gt; &lt;span class=s&gt;'OPTIONS'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=p&gt;{&lt;/span&gt; &lt;span class=s&gt;'DB'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=mi&gt;1&lt;/span&gt;&lt;span class=p&gt;,&lt;/span&gt; &lt;span class=p&gt;},&lt;/span&gt; &lt;span class=p&gt;},&lt;/span&gt;
+    &lt;span class=s&gt;'local'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=p&gt;{&lt;/span&gt; &lt;span class=s&gt;'BACKEND'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=s&gt;'redis_cache.RedisCache'&lt;/span&gt;&lt;span class=p&gt;,&lt;/span&gt; &lt;span class=s&gt;'LOCATION'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=s&gt;'10.10.0.41:6379'&lt;/span&gt;&lt;span class=p&gt;,&lt;/span&gt; &lt;span class=s&gt;'OPTIONS'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=p&gt;{&lt;/span&gt; &lt;span class=s&gt;'DB'&lt;/span&gt;&lt;span class=p&gt;:&lt;/span&gt; &lt;span class=mi&gt;2&lt;/span&gt;&lt;span class=p&gt;,&lt;/span&gt; &lt;span class=p&gt;},&lt;/span&gt; &lt;span class=p&gt;},&lt;/span&gt;
+&lt;span class=p&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;Huzzah.&lt;/p&gt;
+&lt;p&gt;The idea behind all of this is to allow the master to fail while the slave continues
+operating. In a hash based distribution that is possible, however whenever a cache
+member leaves there is no persistance for what was once cached without hacking the
+distributor to deal with n+1 replication of events. Once a hash member is alive again
+all keys that were reallocated to a different member are invalidated simply because the
+distributor won’t think to look there any more unless the same member fails again.. at
+which point you are seeing old data that you couldn’t possible expire using ‘delete’
+since you didn’t know it existed. This makes deleting data in a hash based distribution
+very clumsy.&lt;/p&gt;
+&lt;p&gt;The above scenario works best if you set a key on the slave first and then send it to
+the master. This allows the Django cluster node to have immediate access to data that it
+is attempting to persist into memory between request which is assumed to be the most
+appropriate node (given an intelligent entry distribution for the request/requestor
+pairs). Now the master can fail and come back up without too much of a problem. You can
+take it one step further and store a local set of keys (command queues would be a lot of
+trouble, just use keys) for master updates that never made it for when it comes back
+online and needs to be updated. Redis can be set up using heartbeat and DRBD to mitigate
+the down time of a Redis master as well as supports master/master mode by way of slaving
+eachother. Redis can store the database to disk which is great. You can write a quick
+program to replay the master cache to a new slave if you’re using dynamic nodes since
+redis supports key lookups. You can even have the slave store values only in memory
+while the master uses the disk as well. Lots of options.&lt;/p&gt;
+&lt;div id=comments class=section&gt;
+&lt;h2&gt;Comments&lt;a class=headerlink title="Permalink to this headline" href=/2011/04/05/posts/redispimping.html#comments&gt;¶&lt;/a&gt;&lt;/h2&gt;
+
+        &lt;div id=disqus_thread&gt;&lt;/div&gt;
+        &lt;script type=text/javascript&gt;
+            /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+            var disqus_shortname = 'techbitsgithub'; // required: replace example with your forum shortname
+            var disqus_identifier = 'redispimping';
+
+            /* * * DON'T EDIT BELOW THIS LINE * * */
+            (function() {
+                var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+                dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+                (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+            })();
+        &lt;/script&gt;
+        &lt;noscript&gt;Please enable JavaScript to view the &lt;a href="http://disqus.com/?ref_noscript"&gt;comments powered by Disqus.&lt;/a&gt;&lt;/noscript&gt;
+        &lt;a class=dsq-brlink href=http://disqus.com&gt;comments powered by &lt;span class=logo-disqus&gt;Disqus&lt;/span&gt;&lt;/a&gt;
+        &lt;/div&gt;
+&lt;/div&gt;
+</description><pubDate>Tue, 05 Apr 2011 09:12:09 -0900</pubDate><guid>/2011/04/05/posts/redispimping.html</guid></item></channel></rss>

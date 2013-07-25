@@ -1,0 +1,260 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Django + Redis (master/slave) = Pseudo distributed event based caching &mdash; TechBits 2013-07-25T19:53:17.952100 documentation</title>
+    
+    <link rel="stylesheet" href="../../../../_static/nature.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../../',
+        VERSION:     '2013-07-25T19:53:17.952100',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <link rel="top" title="TechBits 2013-07-25T19:53:17.952100 documentation" href="../../../../index.html" />
+    <link rel="up" title="2011/04/05" href="../blog.html" />
+    <link rel="prev" title="2011/04/05" href="../blog.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../blog.html" title="2011/04/05"
+             accesskey="P">previous</a> |</li>
+        <li><a href="../../../../index.html">TechBits</a> &raquo;</li>
+          <li><a href="../../../../blog.html" >Blog Posts</a> &raquo;</li>
+          <li><a href="../blog.html" accesskey="U">2011/04/05</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="django-redis-master-slave-pseudo-distributed-event-based-caching">
+<h1>Django + Redis (master/slave) = Pseudo distributed event based caching<a class="headerlink" href="#django-redis-master-slave-pseudo-distributed-event-based-caching" title="Permalink to this headline">¶</a></h1>
+<p>This article focuses on the following topology to address usingRedis as the cache
+backend for Django where sets and deletes aresent to a master Redis server along with a
+local or dedicated Redisserver for a set of or single cluster member.</p>
+<blockquote>
+<div><ul class="simple">
+<li>&#8216;Cluster Slave 1&#8217; &lt;- &#8216;Cluster Master 1&#8217;</li>
+<li>&#8216;Cluster Slave 2&#8217; &lt;- &#8216;Cluster Master 1&#8217;</li>
+<li>&#8216;Cluster Slave 3&#8217; &lt;- &#8216;Cluster Master 1&#8217;</li>
+<li>&#8216;Django Node 1&#8217; uses &#8216;Cluster Slave 1&#8217; as &#8216;default&#8217; and Cluster Master 1 as &#8216;master&#8217;</li>
+<li>&#8216;Django Node 2&#8217; uses &#8216;Cluster Slave 2&#8217; as &#8216;default&#8217; and Cluster Master 1 as &#8216;master&#8217;</li>
+<li>&#8216;Django Node 3&#8217; uses &#8216;Cluster Slave 3&#8217; as &#8216;default&#8217; and Cluster Master 1 as &#8216;master&#8217;</li>
+</ul>
+</div></blockquote>
+<p>All updates from &#8216;Cluster Master 1&#8217; are sent to all slaves as quickly as possible, not
+atomic, not verified. This requires you to expect slave cache keys to timeout
+appropriately as a backup.</p>
+<p>You should note that using this method does not necessarilyaugment the standard of a
+memory cache.</p>
+<blockquote>
+<div><ul class="simple">
+<li>Store/Fetch/Invalidate Keys</li>
+<li>Keys can be deleted at any time</li>
+<li>The application is ultimately responsible for understanding cache behaviour</li>
+<li>Caches in a cluster may hold different values for a key</li>
+</ul>
+</div></blockquote>
+<p>Number 4 is really only ever seen in a replicated or isolated environment where the
+backend is a database slave, a database in a master/master relationship, redis, or when
+using many different local caches per cluster. In the setup I am testing there is a
+single local slave at &#8216;10.10.0.41&#8217; and a single master at &#8216;10.10.0.40&#8217;. The redis
+servers are already configured, here is the Django cache configuraiton.</p>
+<div class="highlight-python"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>1
+2
+3
+4</pre></div></td><td class="code"><div class="highlight"><pre><span class="n">CACHES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s">&#39;default&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s">&#39;BACKEND&#39;</span><span class="p">:</span> <span class="s">&#39;redis_cache.RedisCache&#39;</span><span class="p">,</span> <span class="s">&#39;LOCATION&#39;</span><span class="p">:</span> <span class="s">&#39;10.10.0.41:6379&#39;</span><span class="p">,},</span>
+    <span class="s">&#39;master&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s">&#39;BACKEND&#39;</span><span class="p">:</span> <span class="s">&#39;redis_cache.RedisCache&#39;</span><span class="p">,</span> <span class="s">&#39;LOCATION&#39;</span><span class="p">:</span> <span class="s">&#39;10.10.0.40:6379&#39;</span><span class="p">,},</span>
+<span class="p">}</span>
+</pre></div>
+</td></tr></table></div>
+<p>And lets do a little testing:</p>
+<div class="highlight-python"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24</pre></div></td><td class="code"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">django.core.cache</span> <span class="kn">import</span> <span class="n">get_cache</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">slave</span> <span class="o">=</span> <span class="n">get_cache</span><span class="p">(</span><span class="s">&#39;default&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">master</span> <span class="o">=</span> <span class="n">get_cache</span><span class="p">(</span><span class="s">&#39;master&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">master</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s">&#39;hi&#39;</span><span class="p">,</span><span class="s">&#39;there&#39;</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">slave</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;hi&#39;</span><span class="p">)</span>
+<span class="go">&#39;there&#39;</span>
+<span class="go">Huzzah.. it replicated!</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">master</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="s">&#39;hi&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">slave</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;hi&#39;</span><span class="p">)</span>
+<span class="go">Huzzah.. it deleted!</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">master</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s">&#39;hi&#39;</span><span class="p">,</span><span class="s">&#39;there&#39;</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">slave</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s">&#39;hi&#39;</span><span class="p">,</span><span class="s">&#39;pony&#39;</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">master</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;hi&#39;</span><span class="p">)</span>
+<span class="go">&#39;there&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">slave</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;hi&#39;</span><span class="p">)</span>
+<span class="go">&#39;pony&#39;</span>
+<span class="go">Huzzah.. it can be different!</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">master</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="s">&#39;hi&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">master</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;hi&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">slave</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;hi&#39;</span><span class="p">)</span>
+<span class="go">Huzzah.. even though there were differences I can delete the key!</span>
+</pre></div>
+</td></tr></table></div>
+<p>What this means to me is that I can use the master for all changes and isolate all
+lookups to the slave server and if I&#8217;m feeling frisky I can even update the slave
+server. Keep in mind that with Redis and the Django-Redis-Cache module you can specify a
+different namespace or rather database ID making the following possible.</p>
+<div class="highlight-python"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>1
+2
+3
+4
+5</pre></div></td><td class="code"><div class="highlight"><pre><span class="n">CACHES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s">&#39;default&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;BACKEND&#39;</span><span class="p">:</span> <span class="s">&#39;redis_cache.RedisCache&#39;</span><span class="p">,</span> <span class="s">&#39;LOCATION&#39;</span><span class="p">:</span> <span class="s">&#39;10.10.0.41:6379&#39;</span><span class="p">,</span> <span class="s">&#39;OPTIONS&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;DB&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="p">},</span> <span class="p">},</span>
+    <span class="s">&#39;master&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;BACKEND&#39;</span><span class="p">:</span> <span class="s">&#39;redis_cache.RedisCache&#39;</span><span class="p">,</span> <span class="s">&#39;LOCATION&#39;</span><span class="p">:</span> <span class="s">&#39;10.10.0.40:6379&#39;</span><span class="p">,</span> <span class="s">&#39;OPTIONS&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;DB&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="p">},</span> <span class="p">},</span>
+    <span class="s">&#39;local&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;BACKEND&#39;</span><span class="p">:</span> <span class="s">&#39;redis_cache.RedisCache&#39;</span><span class="p">,</span> <span class="s">&#39;LOCATION&#39;</span><span class="p">:</span> <span class="s">&#39;10.10.0.41:6379&#39;</span><span class="p">,</span> <span class="s">&#39;OPTIONS&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;DB&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="p">},</span> <span class="p">},</span>
+<span class="p">}</span>
+</pre></div>
+</td></tr></table></div>
+<p>Huzzah.</p>
+<p>The idea behind all of this is to allow the master to fail while the slave continues
+operating. In a hash based distribution that is possible, however whenever a cache
+member leaves there is no persistance for what was once cached without hacking the
+distributor to deal with n+1 replication of events. Once a hash member is alive again
+all keys that were reallocated to a different member are invalidated simply because the
+distributor won&#8217;t think to look there any more unless the same member fails again.. at
+which point you are seeing old data that you couldn&#8217;t possible expire using &#8216;delete&#8217;
+since you didn&#8217;t know it existed. This makes deleting data in a hash based distribution
+very clumsy.</p>
+<p>The above scenario works best if you set a key on the slave first and then send it to
+the master. This allows the Django cluster node to have immediate access to data that it
+is attempting to persist into memory between request which is assumed to be the most
+appropriate node (given an intelligent entry distribution for the request/requestor
+pairs). Now the master can fail and come back up without too much of a problem. You can
+take it one step further and store a local set of keys (command queues would be a lot of
+trouble, just use keys) for master updates that never made it for when it comes back
+online and needs to be updated. Redis can be set up using heartbeat and DRBD to mitigate
+the down time of a Redis master as well as supports master/master mode by way of slaving
+eachother. Redis can store the database to disk which is great. You can write a quick
+program to replay the master cache to a new slave if you&#8217;re using dynamic nodes since
+redis supports key lookups. You can even have the slave store values only in memory
+while the master uses the disk as well. Lots of options.</p>
+<div class="section" id="comments">
+<h2>Comments<a class="headerlink" href="#comments" title="Permalink to this headline">¶</a></h2>
+
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+            /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+            var disqus_shortname = 'techbitsgithub'; // required: replace example with your forum shortname
+            var disqus_identifier = 'redispimping';
+
+            /* * * DON'T EDIT BELOW THIS LINE * * */
+            (function() {
+                var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+                dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+                (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+            })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        </div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Django + Redis (master/slave) = Pseudo distributed event based caching</a><ul>
+<li><a class="reference internal" href="#comments">Comments</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="../blog.html"
+                        title="previous chapter">2011/04/05</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../../../_sources/2011/04/05/posts/redispimping.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../blog.html" title="2011/04/05"
+             >previous</a> |</li>
+        <li><a href="../../../../index.html">TechBits</a> &raquo;</li>
+          <li><a href="../../../../blog.html" >Blog Posts</a> &raquo;</li>
+          <li><a href="../blog.html" >2011/04/05</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2012, Shane R. Spencer.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2b1.
+    </div>
+  </body>
+</html>
